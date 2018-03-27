@@ -123,24 +123,30 @@ contract SafeMath {
   }
 }
 
+/// @dev This is an empty contract to declare `proxyPayment()` to comply with
+///  Giveth Campaigns so that tokens will be generated when donations are sent
+contract Campaign {
 
-/// @title Token contract - Implements Standard Token Interface but adds Pyramid Scheme Support :)
+    /// @notice `proxyPayment()` allows the caller to send ether to the Campaign and
+    /// have the tokens created in an address of their choosing
+    /// @param _owner The address that will hold the newly created tokens
+    function proxyPayment(address _owner) payable returns(bool);
+}
+
+/// @title Token contract - Implements Standard Token Interface but adds Charity Support :)
 /// @author Rishab Hegde - <contact@rishabhegde.com>
-contract PonziCoin is StandardToken, SafeMath {
+contract FoolToken is StandardToken, SafeMath {
 
     /*
      * Token meta data
      */
-    string constant public name = "PonziCoin";
-    string constant public symbol = "SEC";
+    string constant public name = "FoolToken";
+    string constant public symbol = "POOP";
     uint8 constant public decimals = 3;
+    bool public alive = true;
+    Campaign public beneficiary; // expected to be a Giveth campaign
+    address public owner = 0x506A24fBCb8eDa2EC7d757c943723cFB32a0682E;
 
-    uint public buyPrice = 10 szabo;
-    uint public sellPrice = 2500000000000 wei;
-    uint public tierBudget = 100000;
-
-    // Address of the founder of PonziCoin.
-    address public founder = 0x506A24fBCb8eDa2EC7d757c943723cFB32a0682E;
 
     /*
      * Contract functions
@@ -150,51 +156,30 @@ contract PonziCoin is StandardToken, SafeMath {
     function fund()
       public
       payable 
-      returns (bool)
     {
-      uint tokenCount = msg.value / buyPrice;
-      if (tokenCount > tierBudget) {
-        tokenCount = tierBudget;
-      }
-      
-      uint investment = tokenCount * buyPrice;
+      if (!alive) throw;
+      if (msg.value == 0) throw;
 
+      if (!beneficiary.proxyPayment.value(msg.value)(msg.sender))
+        throw;
+
+      uint tokenCount = 1000 / msg.value;
       balances[msg.sender] += tokenCount;
       Issuance(msg.sender, tokenCount);
-      totalSupply += tokenCount;
-      tierBudget -= tokenCount;
-
-      if (tierBudget <= 0) {
-        tierBudget = 100000;
-        buyPrice *= 2;
-        sellPrice *= 2;
-      }
-      if (msg.value > investment) {
-        msg.sender.transfer(msg.value - investment);
-      }
-      return true;
     }
 
-    function withdraw(uint tokenCount)
-      public
-      returns (bool)
-    {
-      if (balances[msg.sender] >= tokenCount) {
-        uint withdrawal = tokenCount * sellPrice;
-        balances[msg.sender] -= tokenCount;
-        totalSupply -= tokenCount;
-        msg.sender.transfer(withdrawal);
-        return true;
-      } else {
-        return false;
-      }
-    }
-
-    /// @dev Contract constructor function sets initial token balances.
-    function PonziCoin()
+     /// @dev Contract constructor function sets Giveth campaign
+    function FoolToken(Campaign _beneficiary)
     {   
-        // It's not a good scam unless it's pre-mined
-        balances[founder] = 200000;
-        totalSupply += 200000;
+        beneficiary = _beneficiary;
+    }
+
+    /// @dev Allows founder to shut down the contract
+    function killswitch()
+      public
+    {
+      if (msg.sender != owner) throw;
+      alive = false;
     }
 }
+

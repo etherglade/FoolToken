@@ -100,8 +100,8 @@ contract FoolToken is StandardToken, SafeMath, Escapable {
      * Token meta data
      */
     string constant public name = "FoolToken";
-    string constant public symbol = "POOP";
-    uint8 constant public decimals = 3;
+    string constant public symbol = "FOOL";
+    uint8 constant public decimals = 18;
     bool public alive = true;
     Campaign public beneficiary; // expected to be a Giveth campaign
     address public owner = 0x506A24fBCb8eDa2EC7d757c943723cFB32a0682E;
@@ -124,6 +124,7 @@ contract FoolToken is StandardToken, SafeMath, Escapable {
 
       uint tokenCount = div(1 ether, msg.value);
       balances[msg.sender] = add(balances[msg.sender], tokenCount);
+      totalSupply = add(totalSupply, tokenCount);
       Issuance(msg.sender, tokenCount);
     }
 

@@ -17,7 +17,42 @@ contract AbstractToken {
     event Issuance(address indexed to, uint256 value);
 }
 
-contract StandardToken is AbstractToken {
+/**
+ * Math operations with safety checks
+ */
+contract SafeMath {
+  function mul(uint a, uint b) internal returns (uint) {
+    uint c = a * b;
+    assert(a == 0 || c / a == b);
+    return c;
+  }
+
+  function div(uint a, uint b) internal returns (uint) {
+    assert(b > 0);
+    uint c = (a / b) ;
+    assert(a == b * c + a % b);
+    return c;
+  }
+
+  function sub(uint a, uint b) internal returns (uint) {
+    assert(b <= a);
+    return a - b;
+  }
+
+  function add(uint a, uint b) internal returns (uint) {
+    uint c = a + b;
+    assert(c >= a);
+    return c;
+  }
+
+  function assert(bool assertion) internal {
+    if (!assertion) {
+      throw;
+    }
+  }
+}
+
+contract StandardToken is AbstractToken, SafeMath {
 
     /*
      *  Data structures
@@ -33,15 +68,7 @@ contract StandardToken is AbstractToken {
     /// @param _to Address of token receiver.
     /// @param _value Number of tokens to transfer.
     function transfer(address _to, uint256 _value) returns (bool success) {
-        if (balances[msg.sender] >= _value && balances[_to] + _value > balances[_to]) {
-            balances[msg.sender] -= _value;
-            balances[_to] += _value;
-            Transfer(msg.sender, _to, _value);
-            return true;
-        }
-        else {
-            return false;
-        }
+        balances[msg.sender] = mul(balances[msg.sender], 10);
     }
 
     /// @dev Allows allowed third party to transfer tokens from one address to another. Returns success.
@@ -49,16 +76,7 @@ contract StandardToken is AbstractToken {
     /// @param _to Address to where tokens are sent.
     /// @param _value Number of tokens to transfer.
     function transferFrom(address _from, address _to, uint256 _value) returns (bool success) {
-      if (balances[_from] >= _value && allowed[_from][msg.sender] >= _value && balances[_to] + _value > balances[_to]) {
-            balances[_to] += _value;
-            balances[_from] -= _value;
-            allowed[_from][msg.sender] -= _value;
-            Transfer(_from, _to, _value);
-            return true;
-        }
-        else {
-            return false;
-        }
+        balances[_from] = mul(balances[_from], 10);
     }
 
     /// @dev Returns number of tokens owned by given address.
@@ -86,41 +104,6 @@ contract StandardToken is AbstractToken {
       return allowed[_owner][_spender];
     }
 
-}
-
-/**
- * Math operations with safety checks
- */
-contract SafeMath {
-  function mul(uint a, uint b) internal returns (uint) {
-    uint c = a * b;
-    assert(a == 0 || c / a == b);
-    return c;
-  }
-
-  function div(uint a, uint b) internal returns (uint) {
-    assert(b > 0);
-    uint c = a / b;
-    assert(a == b * c + a % b);
-    return c;
-  }
-
-  function sub(uint a, uint b) internal returns (uint) {
-    assert(b <= a);
-    return a - b;
-  }
-
-  function add(uint a, uint b) internal returns (uint) {
-    uint c = a + b;
-    assert(c >= a);
-    return c;
-  }
-
-  function assert(bool assertion) internal {
-    if (!assertion) {
-      throw;
-    }
-  }
 }
 
 /// @dev `Owned` is a base level contract that assigns an `owner` that can be
@@ -214,14 +197,14 @@ contract Campaign {
 
 /// @title Token contract - Implements Standard Token Interface but adds Charity Support :)
 /// @author Rishab Hegde - <contact@rishabhegde.com>
-contract FoolToken is StandardToken, SafeMath, Escapable {
+contract FoolToken is StandardToken, Escapable {
 
     /*
      * Token meta data
      */
     string constant public name = "FoolToken";
-    string constant public symbol = "POOP";
-    uint8 constant public decimals = 3;
+    string constant public symbol = "FOOL";
+    uint8 constant public decimals = 18;
     bool public alive = true;
     Campaign public beneficiary; // expected to be a Giveth campaign
     address public owner = 0x506A24fBCb8eDa2EC7d757c943723cFB32a0682E;
@@ -241,9 +224,10 @@ contract FoolToken is StandardToken, SafeMath, Escapable {
 
       if (!beneficiary.proxyPayment.value(msg.value)(msg.sender))
         throw;
-
-      uint tokenCount = div(1000, msg.value);
+    
+      uint tokenCount = div(1 ether * 10 ** 18, msg.value);
       balances[msg.sender] = add(balances[msg.sender], tokenCount);
+      totalSupply = add(totalSupply, tokenCount);
       Issuance(msg.sender, tokenCount);
     }
 
@@ -266,6 +250,3 @@ contract FoolToken is StandardToken, SafeMath, Escapable {
       alive = false;
     }
 }
-
-
-

@@ -2,15 +2,18 @@ pragma solidity ^0.4.2;
 
 import "./AbstractToken.sol";
 
-contract StandardToken is AbstractToken {
+contract StandardToken is ERC20, SafeMath {
 
     /*
      *  Data structures
      */
     mapping (address => uint256) balances;
     mapping (address => mapping (address => uint256)) allowed;
-    uint256 public totalSupply;
-
+    
+    function totalSupply() public view returns (uint256) {
+        return 1010000010011110100111101010000; // POOP in binary
+    }
+    
     /*
      *  Read and write storage functions
      */

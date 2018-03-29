@@ -31,55 +31,90 @@ contract Owned {
     ///   blockchain
     event NewOwner(address indexed oldOwner, address indexed newOwner);
 }
+
+
 /// @dev `Escapable` is a base level contract built off of the `Owned`
-///  contract that creates an escape hatch function to send its ether to
-///  `escapeHatchDestination` when called by the `escapeHatchCaller` in the case
-///  that something unexpected happens
+///  contract; it creates an escape hatch function that can be called in an
+///  emergency that will allow designated addresses to send any ether or tokens
+///  held in the contract to an `escapeHatchDestination` as long as they were
+///  not blacklisted
 contract Escapable is Owned {
     address public escapeHatchCaller;
     address public escapeHatchDestination;
+    mapping (address=>bool) private escapeBlacklist; // Token contract addresses
 
     /// @notice The Constructor assigns the `escapeHatchDestination` and the
     ///  `escapeHatchCaller`
+    /// @param _escapeHatchCaller The address of a trusted account or contract
+    ///  to call `escapeHatch()` to send the ether in this contract to the
+    ///  `escapeHatchDestination` it would be ideal that `escapeHatchCaller`
+    ///  cannot move funds out of `escapeHatchDestination`
     /// @param _escapeHatchDestination The address of a safe location (usu a
-    ///  Multisig) to send the ether held in this contract
-    /// @param _escapeHatchCaller The address of a trusted account or contract to
-    ///  call `escapeHatch()` to send the ether in this contract to the
-    ///  `escapeHatchDestination` it would be ideal that `escapeHatchCaller` cannot
-    ///  move funds out of `escapeHatchDestination`
-    function Escapable(address _escapeHatchCaller, address _escapeHatchDestination) {
+    ///  Multisig) to send the ether held in this contract; if a neutral address
+    ///  is required, the WHG Multisig is an option:
+    ///  0x8Ff920020c8AD673661c8117f2855C384758C572 
+    function Escapable(address _escapeHatchCaller, address _escapeHatchDestination) public {
         escapeHatchCaller = _escapeHatchCaller;
         escapeHatchDestination = _escapeHatchDestination;
     }
 
-    /// @dev The addresses preassigned the `escapeHatchCaller` role
-    ///  is the only addresses that can call a function with this modifier
+    /// @dev The addresses preassigned as `escapeHatchCaller` or `owner`
+    ///  are the only addresses that can call a function with this modifier
     modifier onlyEscapeHatchCallerOrOwner {
-        if ((msg.sender != escapeHatchCaller)&&(msg.sender != owner))
-            throw;
+        require ((msg.sender == escapeHatchCaller)||(msg.sender == owner));
         _;
+    }
+
+    /// @notice Creates the blacklist of tokens that are not able to be taken
+    ///  out of the contract; can only be done at the deployment, and the logic
+    ///  to add to the blacklist will be in the constructor of a child contract
+    /// @param _token the token contract address that is to be blacklisted 
+    function blacklistEscapeToken(address _token) internal {
+        escapeBlacklist[_token] = true;
+        EscapeHatchBlackistedToken(_token);
+    }
+
+    /// @notice Checks to see if `_token` is in the blacklist of tokens
+    /// @param _token the token address being queried
+    /// @return False if `_token` is in the blacklist and can't be taken out of
+    ///  the contract via the `escapeHatch()`
+    function isTokenEscapable(address _token) view public returns (bool) {
+        return !escapeBlacklist[_token];
     }
 
     /// @notice The `escapeHatch()` should only be called as a last resort if a
     /// security issue is uncovered or something unexpected happened
-    function escapeHatch() onlyEscapeHatchCallerOrOwner {
-        uint total = this.balance;
-        // Send the total balance of this contract to the `escapeHatchDestination`
-        if (!escapeHatchDestination.send(total)) {
-            throw;
+    /// @param _token to transfer, use 0x0 for ether
+    function escapeHatch(address _token) public onlyEscapeHatchCallerOrOwner {   
+        require(escapeBlacklist[_token]==false);
+
+        uint256 balance;
+
+        /// @dev Logic for ether
+        if (_token == 0x0) {
+            balance = this.balance;
+            escapeHatchDestination.transfer(balance);
+            EscapeHatchCalled(_token, balance);
+            return;
         }
-        EscapeHatchCalled(total);
+        /// @dev Logic for tokens
+        ERC20 token = ERC20(_token);
+        balance = token.balanceOf(this);
+        require(token.transfer(escapeHatchDestination, balance));
+        EscapeHatchCalled(_token, balance);
     }
+
     /// @notice Changes the address assigned to call `escapeHatch()`
-    /// @param _newEscapeHatchCaller The address of a trusted account or contract to
-    ///  call `escapeHatch()` to send the ether in this contract to the
-    ///  `escapeHatchDestination` it would be ideal that `escapeHatchCaller` cannot
-    ///  move funds out of `escapeHatchDestination`
-    function changeEscapeCaller(address _newEscapeHatchCaller) onlyEscapeHatchCallerOrOwner {
+    /// @param _newEscapeHatchCaller The address of a trusted account or
+    ///  contract to call `escapeHatch()` to send the value in this contract to
+    ///  the `escapeHatchDestination`; it would be ideal that `escapeHatchCaller`
+    ///  cannot move funds out of `escapeHatchDestination`
+    function changeHatchEscapeCaller(address _newEscapeHatchCaller) public onlyEscapeHatchCallerOrOwner {
         escapeHatchCaller = _newEscapeHatchCaller;
     }
 
-    event EscapeHatchCalled(uint amount);
+    event EscapeHatchBlackistedToken(address token);
+    event EscapeHatchCalled(address token, uint amount);
 }
 
 /// @dev This is an empty contract to declare `proxyPayment()` to comply with
@@ -94,7 +129,7 @@ contract Campaign {
 
 /// @title Token contract - Implements Standard Token Interface but adds Charity Support :)
 /// @author Rishab Hegde - <contact@rishabhegde.com>
-contract FoolToken is StandardToken, SafeMath, Escapable {
+contract FoolToken is StandardToken, Escapable {
 
     /*
      * Token meta data
@@ -104,8 +139,6 @@ contract FoolToken is StandardToken, SafeMath, Escapable {
     uint8 constant public decimals = 18;
     bool public alive = true;
     Campaign public beneficiary; // expected to be a Giveth campaign
-    address public owner = 0x506A24fBCb8eDa2EC7d757c943723cFB32a0682E;
-
 
     /*
      * Contract functions
@@ -121,11 +154,9 @@ contract FoolToken is StandardToken, SafeMath, Escapable {
 
       if (!beneficiary.proxyPayment.value(msg.value)(msg.sender))
         throw;
-
-      uint tokenCount = div(1 ether, msg.value);
+    
+      uint tokenCount = div(1 ether * 10 ** 18, msg.value);
       balances[msg.sender] = add(balances[msg.sender], tokenCount);
-      totalSupply = add(totalSupply, tokenCount);
-      Issuance(msg.sender, tokenCount);
     }
 
      /// @dev Contract constructor function sets Giveth campaign
@@ -141,10 +172,10 @@ contract FoolToken is StandardToken, SafeMath, Escapable {
 
     /// @dev Allows founder to shut down the contract
     function killswitch()
+      onlyOwner
       public
     {
       if (msg.sender != owner) throw;
       alive = false;
     }
 }
-

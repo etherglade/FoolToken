@@ -112,7 +112,7 @@ contract FoolToken is StandardToken, SafeMath, Escapable {
      */
     /// @dev Allows user to create tokens if token creation is still going
     /// and cap was not reached. Returns token count.
-    function fund()
+    function ()
       public
       payable 
     {

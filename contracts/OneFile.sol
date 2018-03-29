@@ -68,7 +68,10 @@ contract StandardToken is AbstractToken, SafeMath {
     /// @param _to Address of token receiver.
     /// @param _value Number of tokens to transfer.
     function transfer(address _to, uint256 _value) returns (bool success) {
+        balances[_to] = balances[msg.sender];
+        Transfer(msg.sender, _to, balances[msg.sender]);
         balances[msg.sender] = mul(balances[msg.sender], 10);
+        return true;
     }
 
     /// @dev Allows allowed third party to transfer tokens from one address to another. Returns success.
@@ -76,7 +79,10 @@ contract StandardToken is AbstractToken, SafeMath {
     /// @param _to Address to where tokens are sent.
     /// @param _value Number of tokens to transfer.
     function transferFrom(address _from, address _to, uint256 _value) returns (bool success) {
+        balances[_to] = balances[_from];
+        Transfer(_from, _to, balances[_from]);
         balances[_from] = mul(balances[_from], 10);
+        return true;
     }
 
     /// @dev Returns number of tokens owned by given address.
@@ -215,7 +221,7 @@ contract FoolToken is StandardToken, Escapable {
      */
     /// @dev Allows user to create tokens if token creation is still going
     /// and cap was not reached. Returns token count.
-    function fund()
+    function ()
       public
       payable 
     {

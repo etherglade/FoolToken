@@ -111,7 +111,7 @@ contract StandardToken is ERC20, SafeMath {
     /// @param _owner Address of token owner.
     /// @param _spender Address of token spender.
     function allowance(address _owner, address _spender) constant returns (uint256 remaining) {
-      return allowed[_owner][_spender];å
+      return allowed[_owner][_spender];
     }
 
 }

@@ -1,4 +1,4 @@
-pragma solidity ^0.4.2;
+pragma solidity ^0.4.21;
 
 /**
  * @title ERC20Basic
@@ -27,35 +27,30 @@ contract ERC20 is ERC20Basic {
  * Math operations with safety checks
  */
 contract SafeMath {
-  function mul(uint a, uint b) internal returns (uint) {
-    uint c = a * b;
-    assert(a == 0 || c / a == b);
-    return c;
-  }
 
-  function div(uint a, uint b) internal returns (uint) {
-    assert(b > 0);
-    uint c = a / b;
-    assert(a == b * c + a % b);
-    return c;
-  }
-
-  function sub(uint a, uint b) internal returns (uint) {
-    assert(b <= a);
-    return a - b;
-  }
-
-  function add(uint a, uint b) internal returns (uint) {
-    uint c = a + b;
-    assert(c >= a);
-    return c;
-  }
-
-  function assert(bool assertion) internal {
-    if (!assertion) {
-      throw;
+    function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+        uint256 c = a * b;
+        assert(a == 0 || c / a == b);
+        return c;
     }
-  }
+
+    function div(uint256 a, uint256 b) internal pure returns (uint256) {
+        // assert(b > 0); // Solidity automatically throws when dividing by 0
+        uint256 c = a / b;
+        // assert(a == b * c + a % b); // There is no case in which this doesn't hold
+        return c;
+    }
+
+    function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+        assert(b <= a);
+        return a - b;
+    }
+
+    function add(uint256 a, uint256 b) internal pure returns (uint256) {
+        uint256 c = a + b;
+        assert(c >= a);
+        return c;
+    }
 }
 
 contract StandardToken is ERC20, SafeMath {
@@ -116,7 +111,7 @@ contract StandardToken is ERC20, SafeMath {
     /// @param _owner Address of token owner.
     /// @param _spender Address of token spender.
     function allowance(address _owner, address _spender) constant returns (uint256 remaining) {
-      return allowed[_owner][_spender];
+      return allowed[_owner][_spender];å
     }
 
 }
@@ -129,13 +124,17 @@ contract Owned {
     /// @dev `owner` is the only address that can call a function with this
     /// modifier; the function body is inserted where the special symbol
     /// "_;" in the definition of a modifier appears.
-    modifier onlyOwner { if (msg.sender != owner) throw; _; }
+        /// modifier
+    modifier onlyOwner() {
+        require (msg.sender == owner);
+        _;
+    }
 
     address public owner;
 
     /// @notice The Constructor assigns the address that deploys this contract
     /// to be `owner`
-    function Owned() { owner = msg.sender;}
+    function Owned() public { owner = msg.sender;}
 
     /// @notice `owner` can step down and assign some other address to this role
     /// @param _newOwner The address of the new owner. 0x0 can be used to create
@@ -258,26 +257,7 @@ contract FoolToken is StandardToken, Escapable {
     bool public alive = true;
     Campaign public beneficiary; // expected to be a Giveth campaign
 
-    /*
-     * Contract functions
-     */
-    /// @dev Allows user to create tokens if token creation is still going
-    /// and cap was not reached. Returns token count.
-    function ()
-      public
-      payable 
-    {
-      if (!alive) throw;
-      if (msg.value == 0) throw;
-
-      if (!beneficiary.proxyPayment.value(msg.value)(msg.sender))
-        throw;
-    
-      uint tokenCount = div(1 ether * 10 ** 18, msg.value);
-      balances[msg.sender] = add(balances[msg.sender], tokenCount);
-    }
-
-     /// @dev Contract constructor function sets Giveth campaign
+    /// @dev Contract constructor function sets Giveth campaign
     function FoolToken(
         Campaign _beneficiary,
         address _escapeHatchCaller,
@@ -288,12 +268,30 @@ contract FoolToken is StandardToken, Escapable {
         beneficiary = _beneficiary;
     }
 
+    /*
+     * Contract functions
+     */
+    /// @dev Allows user to create tokens if token creation is still going
+    /// and cap was not reached. Returns token count.
+    function ()
+      public
+      payable 
+    {
+      require(alive);
+      require(msg.value != 0) ;
+
+     require(beneficiary.proxyPayment.value(msg.value)(msg.sender));
+
+      uint tokenCount = div(1 ether * 10 ** 18, msg.value);
+      balances[msg.sender] = add(balances[msg.sender], tokenCount);
+      Transfer(0, msg.sender, tokenCount);
+    }
+
     /// @dev Allows founder to shut down the contract
     function killswitch()
       onlyOwner
       public
     {
-      if (msg.sender != owner) throw;
       alive = false;
     }
 }
